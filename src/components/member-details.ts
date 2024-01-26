@@ -79,7 +79,6 @@ export class MemberDetails extends LitElement {
   private _onClick() {
     if (this.newName !== '') {
       if (this.editable === false && this.editing === false) {
-        console.log('dispatching "use-member"');
         this.dispatchEvent(new CustomEvent('use-member', getEventDetails(this)));
       } else {
         if (this.editing === true) {
@@ -171,9 +170,6 @@ export class MemberDetails extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
-    console.group('member-details.connectedCallback()');
-    console.log('this.editable:', this.editable);
-    console.groupEnd();
 
     if (this.memberId === '') {
       this.editing = true;
@@ -183,6 +179,7 @@ export class MemberDetails extends LitElement {
     }
     this.newName = this.name;
   }
+
   // attributeChangedCallback() : void {
   //   console.group('attributeChangedCallback()')
   //   console.log('this:', this);

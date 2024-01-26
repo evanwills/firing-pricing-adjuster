@@ -7,6 +7,13 @@ export enum EFiringType  {
   Stoneware,
 }
 
+export type TFiringType = {
+  name: string,
+  default: number,
+  min: number,
+  max: number,
+}
+
 export type TPriceSheet = {
   firingDate: string,
   firingType: EFiringType,

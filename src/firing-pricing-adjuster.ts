@@ -2,16 +2,36 @@ import { LitElement, TemplateResult, css, html } from 'lit'
 import { customElement, state } from 'lit/decorators.js'
 import { TMember, TPerson } from '../types/people.d'
 import { TMemberDetailsEventData } from '../types/components.d'
-// import { TPriceSheet } from '../types/price-sheet.d';
+import { TFiringType } from '../types/price-sheet.d';
 import { listMemberNames } from './utils/member.utils'
 import { storageAvailable } from './utils/general.utils'
 import './components/member-list'
 
-const firingTypes : Array<string> = [
-  'Bisque',
-  'Earthenware',
-  'Midfire',
-  'Stoneware',
+const firingTypes : Array<TFiringType> = [
+  {
+    name: 'Bisque',
+    default: 1000,
+    min: 950,
+    max: 1050
+  },
+  {
+    name: 'Earthenware',
+    default: 1120,
+    min: 1050,
+    max: 1150
+  },
+  {
+    name: 'Midfire',
+    default: 1210,
+    min: 1150,
+    max: 1250
+  },
+  {
+    name: 'Stoneware',
+    default: 1260,
+    min: 1250,
+    max: 1320
+  },
 ];
 
 const firingTemps : Array<number> = [
@@ -21,6 +41,10 @@ const firingTemps : Array<number> = [
   1210,
   1280,
 ];
+
+const defaultType = 'Bisque';
+const defaultTemp = 1000;
+const defaultPrice = 85;
 
 /**
  * An example element.
@@ -51,13 +75,13 @@ export class FiringPricingAdjuster extends LitElement {
   action : string = '';
 
   @state()
-  firingType : string = 'Bisque';
+  firingType : string = defaultType;
 
   @state()
-  firingTemp : number = 1000;
+  firingTemp : number = defaultTemp;
 
   @state()
-  firingCost : number = 85;
+  firingCost : number = defaultPrice;
 
   @state()
   firingDate : string = '';
@@ -84,6 +108,12 @@ export class FiringPricingAdjuster extends LitElement {
   minDate : string = '';
 
   @state()
+  maxTemp : number = 1050;
+
+  @state()
+  minTemp : number = 900;
+
+  @state()
   modal : HTMLDialogElement|null = null;
 
   @state()
@@ -93,53 +123,13 @@ export class FiringPricingAdjuster extends LitElement {
   // ------------------------------------------------------
   // START: Private methods
 
-  private _getNewPerson(member : TMember) : TPerson {
-    return {
-      id: member.id,
-      adjustedTotal: 0,
-      member: member,
-      pieces: [],
-      prepaid: false,
-      total: 0,
+  private _addDoer(event : InputEvent) : void {
+    const target = event.target as HTMLButtonElement;
+
+    if (target !== null) {
+      this.action = target.value;
+      this._showModal();
     }
-  }
-
-  private _notInList(list: Array<TMember|TPerson>, id: string) : boolean {
-    for (let a = 0; a < list.length; a += 1) {
-      if (list[a].id === id) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-
-  private _getUniqueID(list: Array<TMember>, userName: string) : string {
-    const id = userName.toLowerCase().replace(/[^a-z0-9-]+/g, '');
-    const l = list.length;
-    let c = 0;
-    let tmp = id;
-
-    for (let a = 0; a < l; a += 1) {
-      let match = false;
-
-      c += 1;
-
-      for (let b = 0; b < l; b += 1) {
-        if (list[a].id === tmp) {
-          match = true;
-          break;
-        }
-      }
-
-      if (match === false) {
-        return tmp;
-      }
-
-      tmp = `${id}${c}`;
-    }
-
-    throw new Error(`_getUniqueID() was unable to generate a unique ID for ${userName}`);
   }
 
   private _addUser(action : string, id : string) {
@@ -187,6 +177,72 @@ export class FiringPricingAdjuster extends LitElement {
     }
   }
 
+  private _getLocalData(prop : string) {
+    switch (this.storageType) {
+      case 'localStorage':
+        return localStorage.getItem(prop);
+
+      case 'sessionStorage':
+        return sessionStorage.getItem(prop);
+    }
+  }
+
+  private _getNewPerson(member : TMember) : TPerson {
+    return {
+      id: member.id,
+      adjustedTotal: 0,
+      member: member,
+      pieces: [],
+      prepaid: false,
+      total: 0,
+    }
+  }
+
+  private _getUniqueID(list: Array<TMember>, userName: string) : string {
+    const id = userName.toLowerCase().replace(/[^a-z0-9-]+/g, '');
+    const l = list.length;
+    let c = 0;
+    let tmp = id;
+
+    for (let a = 0; a < l; a += 1) {
+      let match = false;
+
+      c += 1;
+
+      for (let b = 0; b < l; b += 1) {
+        if (list[a].id === tmp) {
+          match = true;
+          break;
+        }
+      }
+
+      if (match === false) {
+        return tmp;
+      }
+
+      tmp = `${id}${c}`;
+    }
+
+    throw new Error(`_getUniqueID() was unable to generate a unique ID for ${userName}`);
+  }
+
+  private _memberManager() : void {
+    this.action = '';
+    this.useMember = false;
+    this.membersList = [...this.membersList];
+
+    this._showModal();
+  }
+
+  private _notInList(list: Array<TMember|TPerson>, id: string) : boolean {
+    for (let a = 0; a < list.length; a += 1) {
+      if (list[a].id === id) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private _persistLocally(prop : string, value: any) {
     let valueType : string = typeof value;
     let data : any = value;
@@ -207,13 +263,105 @@ export class FiringPricingAdjuster extends LitElement {
     }
   }
 
-  private _getLocalData(prop : string) {
-    switch (this.storageType) {
-      case 'localStorage':
-        return localStorage.getItem(prop);
+  private _removeDoer(event : InputEvent) : void {
+    const target = event.target as HTMLButtonElement;
 
-      case 'sessionStorage':
-        return sessionStorage.getItem(prop);
+    if (target !== null) {
+      let l = 0;
+      switch (target.value) {
+        case 'remove-priced-by':
+          l = this.pricedBy.length - 1;
+          this.pricedBy = this.pricedBy.slice(0, l);
+          this._persistLocally('pricedBy', this.pricedBy);
+          break;
+
+        case 'remove-packed-by':
+          l = this.packedBy.length - 1;
+          this.packedBy = this.packedBy.slice(0, l);
+          this._persistLocally('packedBy', this.packedBy);
+          break;
+      }
+    }
+  }
+
+  private _reset() : void {
+    this.firingDate = '';
+    this.firingType = defaultType;
+    this.firingTemp = defaultTemp;
+    this.firingCost = defaultPrice;
+    this.packedBy = [];
+    this.pricedBy = [];
+    this.work = [];
+
+    this._setMinMaxTemp();
+    this._persistLocally('firingCost', this.firingCost);
+    this._persistLocally('firingDate', this.firingDate);
+    this._persistLocally('firingTemp', this.firingTemp);
+    this._persistLocally('firingType', this.firingType);
+    this._persistLocally('packedBy', this.packedBy);
+    this._persistLocally('pricedBy', this.pricedBy);
+    this._persistLocally('work', this.work);
+  }
+
+  private _setMinMaxTemp() : void {
+    const fType : TFiringType = firingTypes.filter(
+      (item) => (item.name === this.firingType),
+    )[0];
+
+    if (typeof fType !== 'undefined') {
+      this.minTemp = fType.min;
+      this.maxTemp = fType.max;
+      this.firingTemp = fType.default;
+    }
+  }
+
+  private _setProp (event : InputEvent) : void {
+    const target = event.target as HTMLInputElement;
+
+    if (target !== null) {
+      const { id, value } = target;
+      let skip = true;
+
+      switch (id) {
+        case 'firingDate':
+          this.firingDate = value;
+          skip = false;
+          break;
+
+        case 'firingType':
+          this.firingType = value;
+          this._setMinMaxTemp();
+          skip = false;
+          break;
+
+        case 'firingTemp':
+          this.firingTemp = parseInt(value, 10);
+          skip = false;
+          break;
+
+        case 'firingCost':
+          this.firingCost = parseInt(value, 10);
+          skip = false;
+          break;
+      }
+
+      if (skip === false) {
+        this._persistLocally(id, value);
+      }
+    }
+  }
+
+  private _showModal() {
+    if (this.modal === null) {
+      const tmp = this.renderRoot.querySelector('#member-dialogue');
+
+      if (typeof tmp !== 'undefined' && tmp !== null) {
+        this.modal = tmp as HTMLDialogElement;
+      }
+    }
+
+    if (this.modal !== null && typeof this.modal !== 'undefined') {
+      this.modal.showModal();
     }
   }
 
@@ -254,105 +402,6 @@ export class FiringPricingAdjuster extends LitElement {
       this._addUser(action, id);
       this.showMemberList = false;
       this.modal?.close();
-    }
-  }
-
-  private _showModal() {
-    console.group('_showModal()');
-    console.log('this.modal (before):', this.modal);
-    if (this.modal === null) {
-      const tmp = this.renderRoot.querySelector('#member-dialogue');
-      console.log('tmp:', tmp);
-
-
-      if (typeof tmp !== 'undefined' && tmp !== null) {
-        this.modal = tmp as HTMLDialogElement;
-      }
-    }
-    console.log('this.modal (after):', this.modal);
-
-    if (this.modal !== null && typeof this.modal !== 'undefined') {
-      this.modal.showModal();
-    }
-  }
-
-  private _addDoer(event : InputEvent) : void {
-    const target = event.target as HTMLButtonElement;
-
-    if (target !== null) {
-      this.action = target.value;
-      this._showModal();
-    }
-  }
-
-  private _removeDoer(event : InputEvent) : void {
-    const target = event.target as HTMLButtonElement;
-
-    if (target !== null) {
-      let l = 0;
-      switch (target.value) {
-        case 'remove-priced-by':
-          l = this.pricedBy.length - 1;
-          this.pricedBy = this.pricedBy.slice(0, l);
-          this._persistLocally('pricedBy', this.pricedBy);
-          break;
-
-        case 'remove-packed-by':
-          l = this.packedBy.length - 1;
-          this.packedBy = this.packedBy.slice(0, l);
-          this._persistLocally('packedBy', this.packedBy);
-          break;
-      }
-    }
-  }
-
-  private _memberManager() : void {
-    console.group('_memberManager()');
-    console.log('this.action (before):', this.action);
-    console.log('this.useMember (before):', this.useMember);
-    this.action = '';
-    this.useMember = false;
-    this.membersList = [...this.membersList];
-
-    this._showModal();
-    console.log('this.action (after):', this.action);
-    console.log('this.useMember (after):', this.useMember);
-    console.groupEnd();
-  }
-
-  private _setProp (event : InputEvent) : void {
-    const target = event.target as HTMLInputElement;
-
-    if (target !== null) {
-      console.log('target:', target);
-      const { id, value } = target;
-      let skip = true;
-
-      switch (id) {
-        case 'firingDate':
-          this.firingDate = value;
-          skip = false;
-          break;
-
-        case 'firingType':
-          this.firingType = value;
-          skip = false;
-          break;
-
-        case 'firingTemp':
-          this.firingTemp = parseInt(value, 10);
-          skip = false;
-          break;
-
-        case 'firingCost':
-          this.firingCost = parseInt(value, 10);
-          skip = false;
-          break;
-      }
-
-      if (skip === false) {
-        this._persistLocally(id, value);
-      }
     }
   }
 
@@ -440,7 +489,7 @@ export class FiringPricingAdjuster extends LitElement {
       <h1>Firing pricing adjuster</h1>
       <ul class="input-fields">
         <li class="key-value-pair">
-          <label for="firingDate">Date firing started:</label>
+          <label for="firingDate">Unpacking date:</label>
           <input id="firingDate"
                  max="${this.maxDate}"
                  min="${this.minDate}"
@@ -453,8 +502,11 @@ export class FiringPricingAdjuster extends LitElement {
           <select id="firingType"
                 .value=${this.firingType}
                 @change=${this._setProp}>
-            ${firingTypes.map((item : string) : TemplateResult => html`
-              <option value="${item}" ?selected=${item === this.firingType}>${item}</option>
+            ${firingTypes.map((item : TFiringType) : TemplateResult => html`
+              <option value="${item.name}"
+                     ?selected=${item.name === this.firingType}>
+                ${item.name}
+              </option>
             `)}
           </select>
         </li>
@@ -462,8 +514,8 @@ export class FiringPricingAdjuster extends LitElement {
           <label for="firingTemp">Top temperature:</label>
           <input id="firingTemp"
                  list="standard-temps"
-                 max="1320"
-                 min="573"
+                 .max="${this.maxTemp}"
+                 .min="${this.minTemp}"
                  step="10"
                  type="number"
                 .value=${this.firingTemp}
@@ -525,6 +577,7 @@ export class FiringPricingAdjuster extends LitElement {
         : html`<button>Start pricing</button>`
       }
       <button @click=${this._memberManager}>Manage members</button>
+      <button @click=${this._reset}>Reset data</button>
       <dialog id="member-dialogue">
         <h2>${(this.useMember) ? 'Select a member' : 'Manage members'}</h2>
         <member-list .action="${this.action}"
@@ -567,6 +620,7 @@ export class FiringPricingAdjuster extends LitElement {
       } else {
         this._persistLocally('firingType', this.firingType);
       }
+      this._setMinMaxTemp();
 
       const firingTemp = this._getLocalData('firingTemp') as string;
       if (firingTemp !== null) {
@@ -597,7 +651,6 @@ export class FiringPricingAdjuster extends LitElement {
       }
 
       const membersList = this._getLocalData('membersList') as string;
-      console.log('members')
       if (membersList !== null) {
         this.membersList = JSON.parse(membersList);
       } else {
