@@ -15,6 +15,7 @@ export type TMember = {
    * @property
    */
   name: string,
+  pos: number,
 }
 
 export type TPerson = {
@@ -59,3 +60,15 @@ export type TPerson = {
    */
   total: number,
 }
+
+export type TMakerChangeData = {
+  id: string,
+  index: number|null,
+  value: number,
+}
+
+export type TMakerEventData = {
+  bubbles: boolean,
+  composed: boolean,
+  detail: TMakerChangeData,
+};

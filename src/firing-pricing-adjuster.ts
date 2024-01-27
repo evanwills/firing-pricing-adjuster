@@ -1,11 +1,13 @@
-import { LitElement, TemplateResult, css, html } from 'lit'
-import { customElement, state } from 'lit/decorators.js'
-import { TMember, TPerson } from '../types/people.d'
-import { TMemberDetailsEventData } from '../types/components.d'
+import { LitElement, TemplateResult, css, html } from 'lit';
+import { customElement, state } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
+import { TMakerEventData, TMember, TPerson } from '../types/people.d';
+import { TMemberDetailsEventData } from '../types/components.d';
 import { TFiringType } from '../types/price-sheet.d';
-import { listMemberNames } from './utils/member.utils'
-import { storageAvailable } from './utils/general.utils'
-import './components/member-list'
+import { getUniqueID, listMemberNames, sortMembers } from './utils/member.utils';
+import { copyToClipboard, dateFromISO, renderTxtPriceList, storageAvailable, updateTotals } from './utils/general.utils';
+import './components/member-list';
+import './components/price-list';
 
 const firingTypes : Array<TFiringType> = [
   {
@@ -33,6 +35,7 @@ const firingTypes : Array<TFiringType> = [
     max: 1320
   },
 ];
+const dateErrorMsg = 'Pricing cannot be done in the future';
 
 const firingTemps : Array<number> = [
   1000,
@@ -59,20 +62,49 @@ export class FiringPricingAdjuster extends LitElement {
    */
   @state()
   membersList : Array<TMember> = [
-    {
-      id: 'evanw',
-      name: 'Evan Wills',
-      makersMark: 'boo'
-    },
-    {
-      id: 'georgiep',
-      name: 'Georgie Pike',
-      makersMark: 'boo'
-    }
+    // {
+    //   id: 'evanw',
+    //   name: 'Evan Wills',
+    //   makersMark: '',
+    //   pos: 0,
+    // },
+    // {
+    //   id: 'georgiep',
+    //   name: 'Georgie Pike',
+    //   makersMark: '',
+    //   pos: 1,
+    // },
+    // {
+    //   id: 'mark',
+    //   name: 'Mark Malek',
+    //   makersMark: '',
+    //   pos: 4,
+    // },
+    // {
+    //   id: 'natasha',
+    //   name: 'Natasha Holdem',
+    //   makersMark: '',
+    //   pos: 3,
+    // },
+    // {
+    //   id: 'netta',
+    //   name: 'Netta Egoz',
+    //   makersMark: '',
+    //   pos: 2,
+    // },
   ]
 
   @state()
   action : string = '';
+
+  @state()
+  adjustmentFactor : number = 1;
+
+  @state()
+  dateError : string = '';
+
+  @state()
+  defaultTemp : number = 1000;
 
   @state()
   firingType : string = defaultType;
@@ -84,7 +116,22 @@ export class FiringPricingAdjuster extends LitElement {
   firingCost : number = defaultPrice;
 
   @state()
-  firingDate : string = '';
+  firingDate : string = dateFromISO(new Date());
+
+  @state()
+  maxDate : string = '';
+
+  @state()
+  maxTemp : number = 1050;
+
+  @state()
+  minDate : string = '';
+
+  @state()
+  minTemp : number = 900;
+
+  @state()
+  memberModal : HTMLDialogElement|null = null;
 
   @state()
   packedBy : Array<TMember> = [];
@@ -93,31 +140,28 @@ export class FiringPricingAdjuster extends LitElement {
   pricedBy : Array<TMember> = [];
 
   @state()
+  showMemberList : boolean = false;
+
+  @state()
+  report : string = '';
+
+  @state()
+  reportModal : HTMLDialogElement|null = null;
+
+  @state()
+  storageType : string = '';
+
+  @state()
+  tempError : TemplateResult|string = '';
+
+  @state()
+  textarea : HTMLTextAreaElement|null = null;
+
+  @state()
   useMember : boolean = true;
 
   @state()
   work : Array<TPerson> = [];
-
-  @state()
-  showMemberList : boolean = false;
-
-  @state()
-  maxDate : string = '';
-
-  @state()
-  minDate : string = '';
-
-  @state()
-  maxTemp : number = 1050;
-
-  @state()
-  minTemp : number = 900;
-
-  @state()
-  modal : HTMLDialogElement|null = null;
-
-  @state()
-  storageType : string = '';
 
   //  END:  Property/Attribute declarations
   // ------------------------------------------------------
@@ -128,8 +172,16 @@ export class FiringPricingAdjuster extends LitElement {
 
     if (target !== null) {
       this.action = target.value;
-      this._showModal();
+      this._showMemberModal();
     }
+  }
+
+  private _addMaker() : void {
+    this.action = 'set-potter';
+    this.useMember = true;
+    this.membersList = sortMembers([...this.membersList]);
+
+    this._showMemberModal();
   }
 
   private _addUser(action : string, id : string) {
@@ -177,6 +229,28 @@ export class FiringPricingAdjuster extends LitElement {
     }
   }
 
+  private _closeMemberList() : void {
+    console.group('_closeMemberList()');
+    this.memberModal?.close();
+    console.groupEnd();
+  }
+
+  private _closePriceReport() : void {
+    this.reportModal?.close();
+  }
+
+  private _copyReport() : void {
+    const tmp = this.renderRoot.querySelector('#price-report textarea');
+
+    if (typeof tmp !== 'undefined' && tmp !== null) {
+      this.textarea = tmp as HTMLTextAreaElement;
+      this.textarea.focus();
+      this.textarea.select();
+
+      copyToClipboard(this.report);
+    }
+  }
+
   private _getLocalData(prop : string) {
     switch (this.storageType) {
       case 'localStorage':
@@ -198,40 +272,30 @@ export class FiringPricingAdjuster extends LitElement {
     }
   }
 
-  private _getUniqueID(list: Array<TMember>, userName: string) : string {
-    const id = userName.toLowerCase().replace(/[^a-z0-9-]+/g, '');
-    const l = list.length;
-    let c = 0;
-    let tmp = id;
-
-    for (let a = 0; a < l; a += 1) {
-      let match = false;
-
-      c += 1;
-
-      for (let b = 0; b < l; b += 1) {
-        if (list[a].id === tmp) {
-          match = true;
-          break;
-        }
-      }
-
-      if (match === false) {
-        return tmp;
-      }
-
-      tmp = `${id}${c}`;
+  private _getTempError(val: number) : TemplateResult|string {
+    let dir = '';
+    let tmp = 0;
+    if (val < this.minTemp) {
+      dir = 'less';
+      tmp = this.minTemp;
+    } else if (val > this.maxTemp) {
+      dir = 'more';
+      tmp = this.maxTemp;
     }
 
-    throw new Error(`_getUniqueID() was unable to generate a unique ID for ${userName}`);
+    if (dir === '') {
+      return '';
+    }
+
+    return html`Top temperature for a ${this.firingType} firing must be between ${this.minTemp}&deg;C and ${this.maxTemp}&deg;C. "${val}" is ${dir} than ${tmp}&deg;C`
   }
 
   private _memberManager() : void {
     this.action = '';
     this.useMember = false;
-    this.membersList = [...this.membersList];
+    this.membersList = sortMembers([...this.membersList]);
 
-    this._showModal();
+    this._showMemberModal();
   }
 
   private _notInList(list: Array<TMember|TPerson>, id: string) : boolean {
@@ -285,7 +349,7 @@ export class FiringPricingAdjuster extends LitElement {
   }
 
   private _reset() : void {
-    this.firingDate = '';
+    this.firingDate = dateFromISO(new Date());
     this.firingType = defaultType;
     this.firingTemp = defaultTemp;
     this.firingCost = defaultPrice;
@@ -311,8 +375,13 @@ export class FiringPricingAdjuster extends LitElement {
     if (typeof fType !== 'undefined') {
       this.minTemp = fType.min;
       this.maxTemp = fType.max;
+      this.defaultTemp = fType.default;
       this.firingTemp = fType.default;
     }
+  }
+
+  private _showErrors () : boolean {
+    return (this.firingDate === '' || this.packedBy.length === 0 || this.pricedBy.length === 0);
   }
 
   private _setProp (event : InputEvent) : void {
@@ -324,7 +393,14 @@ export class FiringPricingAdjuster extends LitElement {
 
       switch (id) {
         case 'firingDate':
-          this.firingDate = value;
+          console.log('target:', target);
+          if (new Date(value).getTime() < Date.now()) {
+            this.firingDate = value;
+            this.dateError = '';
+          } else {
+            target.value = '';
+            this.dateError = dateErrorMsg;
+          }
           skip = false;
           break;
 
@@ -335,8 +411,15 @@ export class FiringPricingAdjuster extends LitElement {
           break;
 
         case 'firingTemp':
-          this.firingTemp = parseInt(value, 10);
-          skip = false;
+          const temp = parseInt(value, 10);
+          this.tempError = this._getTempError(temp);
+
+          if (this.tempError === '') {
+            this.firingTemp = temp;
+            skip = false;
+          } else {
+            target.value = this.defaultTemp.toString();
+          }
           break;
 
         case 'firingCost':
@@ -351,18 +434,49 @@ export class FiringPricingAdjuster extends LitElement {
     }
   }
 
-  private _showModal() {
-    if (this.modal === null) {
+  private _showMemberModal() {
+    if (this.memberModal === null) {
       const tmp = this.renderRoot.querySelector('#member-dialogue');
 
       if (typeof tmp !== 'undefined' && tmp !== null) {
-        this.modal = tmp as HTMLDialogElement;
+        this.memberModal = tmp as HTMLDialogElement;
       }
     }
 
-    if (this.modal !== null && typeof this.modal !== 'undefined') {
-      this.modal.showModal();
+    if (this.memberModal !== null && typeof this.memberModal !== 'undefined') {
+      this.memberModal.showModal();
     }
+  }
+
+  private _showReportModal() {
+    if (this.reportModal === null) {
+      const tmp = this.renderRoot.querySelector('#price-report');
+
+      if (typeof tmp !== 'undefined' && tmp !== null) {
+        this.reportModal = tmp as HTMLDialogElement;
+      }
+    }
+
+    if (this.reportModal !== null && typeof this.reportModal !== 'undefined') {
+      this.reportModal.showModal();
+    }
+  }
+
+  private _showReport() {
+    let type = 'bisque';
+    let temp = '';
+
+    if (this.firingType !== 'Bisque') {
+      type = 'glaze';
+      temp = ` ${this.firingType.toLowerCase()} (${this.firingTemp}°C)`;
+    }
+
+    this.report = `The last ${type}${temp} firing (packed by: `
+      + `${listMemberNames(this.packedBy)}) has been upacked by `
+      + `${listMemberNames(this.pricedBy)}.\n\nBelow are the for the `
+      + `member's fired work:\n${renderTxtPriceList(this.work)}`;
+
+    this._showReportModal();
   }
 
   private _updateMember(event : TMemberDetailsEventData) : void {
@@ -370,29 +484,70 @@ export class FiringPricingAdjuster extends LitElement {
     let _id = id;
 
     if (_id === '') {
-      _id = this._getUniqueID(this.membersList, name);
-      this.membersList = [...this.membersList, {
+      _id = getUniqueID(this.membersList, name);
+      this.membersList = sortMembers([
+        ...this.membersList, {
         id: _id,
         name: event.detail.name,
         makersMark: '',
-      }];
+        pos: this.membersList.length,
+      }]);
     } else {
-      this.membersList = this.membersList.map((member) => (member.id === _id)
+      this.membersList = sortMembers(this.membersList.map((member) => (member.id === _id)
         ? ({
           ...member,
           name: name,
           makersMark: mark,
         })
         : member
-      );
+      ));
     }
     this._persistLocally('membersList', this.membersList);
 
     if (action !== '') {
       this._addUser(action, _id);
       this.showMemberList = false;
-      this.modal?.close();
+      this.memberModal?.close();
     }
+  }
+
+  private _updateMaker(event : TMakerEventData) : void {
+    console.group('_updateMaker()');
+    const { id, index, value } = event.detail;
+    const _val = (typeof value === 'string')
+      ? parseInt(value, 10)
+      : value;
+    const _ind = (index !== null && typeof index === 'string')
+      ? parseInt(index)
+      : index;
+    console.log('index:', index, typeof index);
+
+    this.work = updateTotals(
+      this.firingCost,
+      this.work.map((maker : TPerson) => {
+        if (maker.id !== id) {
+          return maker;
+        }
+
+        let _pieces : Array<number> = [];
+
+        if (_ind !== null) {
+          _pieces = maker.pieces.map((piece, i) => (_ind === i)
+            ? _val
+            : piece
+          ).filter((piece: number) : boolean => piece > 0);
+        } else if (_val !== 0) {
+          _pieces = [...maker.pieces, _val];
+        }
+        return {
+          ...maker,
+          pieces: _pieces,
+        };
+      }),
+    );
+
+    this._persistLocally('work', this.work);
+    console.groupEnd();
   }
 
   private _useMember(event : TMemberDetailsEventData) : void {
@@ -401,7 +556,7 @@ export class FiringPricingAdjuster extends LitElement {
     if (action !== '') {
       this._addUser(action, id);
       this.showMemberList = false;
-      this.modal?.close();
+      this.memberModal?.close();
     }
   }
 
@@ -438,6 +593,7 @@ export class FiringPricingAdjuster extends LitElement {
       align-items: flex-start;
       column-gap: 0.5rem;
       display: flex;
+      flex-wrap: wrap;
       max-width: 20rem;
       margin: 0;
       padding: 0.5rem 0;
@@ -462,18 +618,52 @@ export class FiringPricingAdjuster extends LitElement {
       margin: 2rem 0 0;
       padding: 0;
     }
-    .data-errors li {
+    .error-msg {
       text-align: left;
-      list-style: none;
       border: 0.1rem solid #fff;
       border-radius: 0.5rem;
       background-color: #a00;
-      padding: 0.3rem .65rem;
+      font-shadow: 0 0 0.5 rgba(0, 0, 0, 0.7);
+      // font-weight: bold;
+      list-style: none;
       max-width: 20rem;
       margin: 0.5rem 0;
-      font-weight: bold;
-      font-shadow: 0 0 0.5 rgba(0, 0, 0, 0.7);
+      padding: 0.3rem .65rem;
+      width: 100%;
     }
+    dialog {
+      position: relative;
+      padding: 2rem;
+      border: 0.05rem solid #ccc;
+      border-radius: 1rem;
+    }
+    dialog::backdrop {
+      background-color: rgba(0, 0, 0, 0.8);
+    }
+    .close-dialogue {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      display: inline-block;
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: 5rem;
+      border: 0.05rem solid #ccc;
+    }
+    pre {
+      text-align: left;
+      max-width: 25rem;
+      white-space: pre-wrap;
+    }
+    textarea {
+      text-align: left;
+      max-width: 25rem;
+      white-space: pre-wrap;
+      width: 100%;
+      display: block;
+      min-height: 15rem;
+    }
+
     dialog h2 {
       font-size: 1.4rem;
       margin-top: 0;
@@ -496,6 +686,9 @@ export class FiringPricingAdjuster extends LitElement {
                  type="date"
                 .value=${this.firingDate}
                 @change=${this._setProp} />
+          ${(this.dateError !== '')
+            ? html`<p class="error-msg">${this.dateError}</p>`
+            : ''}
         </li>
         <li class="key-value-pair">
           <label for="firingType">Type of firing:</label>
@@ -505,7 +698,7 @@ export class FiringPricingAdjuster extends LitElement {
             ${firingTypes.map((item : TFiringType) : TemplateResult => html`
               <option value="${item.name}"
                      ?selected=${item.name === this.firingType}>
-                ${item.name}
+                ${item.name} ${item.name !== 'Bisque' ? 'Glaze' : ''}
               </option>
             `)}
           </select>
@@ -520,10 +713,16 @@ export class FiringPricingAdjuster extends LitElement {
                  type="number"
                 .value=${this.firingTemp}
                 @change=${this._setProp} />
+          ${(this.tempError !== '')
+            ? html`<p class="error-msg">${this.tempError}</p>`
+            : ''}
           <datalist id="standard-temps">
-            ${firingTemps.map((item : number) : TemplateResult => html`
-              <option value="${item}"></option>
-            `)}
+            ${repeat(
+              firingTemps.filter((item: number) => (item >= this.minTemp && item <= this.maxTemp)),
+              (item) => item,
+              (item : number) : TemplateResult => html`
+              <option value="${item}"></option>`
+            )}
           </datalist>
         </li>
         <li class="key-value-pair">
@@ -559,34 +758,56 @@ export class FiringPricingAdjuster extends LitElement {
             : ''}
         </li>
       </ul>
-      ${(this.firingDate === '' || this.packedBy.length === 0 || this.pricedBy.length === 0)
+      ${(this._showErrors())
         ? html`<ul class="data-errors">
           ${(this.firingDate === '')
-            ? html`<li>Please enter the date the firing started</li>`
+            ? html`<li class="error-msg">Please enter the date the firing was unpacked</li>`
             : ''
           }
           ${(this.packedBy.length === 0)
-            ? html`<li>Please list one or more of the people who packed the kiln.</li>`
+            ? html`<li class="error-msg">Please list one or more of the people who packed the kiln.</li>`
             : ''
           }
           ${(this.pricedBy.length === 0)
-            ? html`<li>Please list one or more of the people who unpacked the kiln.</li>`
+            ? html`<li class="error-msg">Please list one or more of the people who unpacked the kiln.</li>`
             : ''
           }
         </ul>`
-        : html`<button>Start pricing</button>`
+        : ''
       }
-      <button @click=${this._memberManager}>Manage members</button>
-      <button @click=${this._reset}>Reset data</button>
+      <p class="buttons-list">
+        ${(this._showErrors() === false && this.work.length === 0)
+          ? html`<button @click=${this._addMaker}>Start pricing</button>`
+          : ''
+        }
+        <button @click=${this._memberManager}>Manage members</button>
+        <button @click=${this._reset}>Reset firing</button>
+      </p>
       <dialog id="member-dialogue">
         <h2>${(this.useMember) ? 'Select a member' : 'Manage members'}</h2>
         <member-list .action="${this.action}"
                      ?editable=${!this.useMember}
                      .list=${this.membersList}
                      @save-member=${this._updateMember}
-                     @use-member=${this._useMember} ></member-list>
+                     @use-member=${this._useMember}></member-list>
+        <button aria-label="Close member list" class="close-dialogue" @click=${this._closeMemberList}>X</button>
       </dialog>
-      <dialog id="price-report"></dialog>
+      ${(this.work.length > 0)
+        ? html`<price-list .adjustment=${this.adjustmentFactor}
+                           .cost=${this.firingCost}
+                           .work=${this.work}
+                           @add-maker=${this._addMaker}
+                           @update-maker=${this._updateMaker}
+                           @show-report=${this._showReport}></price-list>`
+        : ''
+      }
+      <dialog id="price-report">
+        <h2>Pricing report to send to members</h2>
+        <textarea>${this.report}</textarea>
+        <!-- <pre>${this.report}</pre> -->
+        <button aria-label="Close member list" class="close-dialogue" @click=${this._closePriceReport}>X</button>
+        <button aria-label="Copy report" @click=${this._copyReport}>Copy</button>
+      </dialog>
     `;
   }
 
@@ -597,8 +818,8 @@ export class FiringPricingAdjuster extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
 
-    this.maxDate = new Date().toISOString();
-    this.minDate = new Date(Date.now() - 2592000000).toISOString();
+    this.maxDate = dateFromISO(new Date());
+    this.minDate = dateFromISO(new Date(Date.now() - 2592000000));
 
     if (storageAvailable('localStorage')) {
       this.storageType = 'localStorage';
@@ -652,9 +873,9 @@ export class FiringPricingAdjuster extends LitElement {
 
       const membersList = this._getLocalData('membersList') as string;
       if (membersList !== null) {
-        this.membersList = JSON.parse(membersList);
+        this.membersList = sortMembers(JSON.parse(membersList));
       } else {
-        this._persistLocally('membersList', this.membersList);
+        this._persistLocally('membersList', sortMembers(this.membersList));
       }
 
       const work = this._getLocalData('work') as string;

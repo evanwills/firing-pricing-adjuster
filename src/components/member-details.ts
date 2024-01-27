@@ -1,4 +1,4 @@
-import { LitElement, TemplateResult, css, html } from 'lit'
+import { LitElement, css, html } from 'lit'
 import { customElement, property, state } from 'lit/decorators.js'
 import { getEventDetails } from '../utils/member.utils';
 
@@ -149,6 +149,7 @@ export class MemberDetails extends LitElement {
             <input type="text"
                   .value=${this.newName}
                    aria-label="Member name"
+                   placeholder="name (e.g. gabe)"
                   @change=${this._memberChange}
                   @keyup=${this._memberChange} />`
           : html`

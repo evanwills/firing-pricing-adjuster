@@ -26,6 +26,11 @@ export const getUniqueID = (list: Array<TMember>, userName: string) : string => 
   let c = 0;
   let tmp = id;
 
+  if (l === 0) {
+    return id;
+  }
+
+
   for (let a = 0; a < l; a += 1) {
     let match = false;
 
@@ -39,6 +44,7 @@ export const getUniqueID = (list: Array<TMember>, userName: string) : string => 
     }
 
     if (match === false) {
+      console.groupEnd();
       return tmp;
     }
 
@@ -63,4 +69,21 @@ export const listMemberNames = (list: Array<TMember>) : string => {
   const names = list.map((item : TMember) : string => item.name).join(', ');
 
   return names.replace(/,(?= [^,]+$)/ig, ' &');
+}
+
+export const memberSorter = (a : TMember, b : TMember) : number => {
+  if (a.id < b.id) {
+    return -1;
+  }
+  return (a.name > b.name)
+    ? 1
+    : 0;
+};
+
+export const sortMembers = (list : Array<TMember>) : Array<TMember> => {
+  const output = [...list];
+
+  output.sort(memberSorter);
+
+  return output.map((member : TMember, i : number) : TMember => ({ ...member, pos: i}));
 }

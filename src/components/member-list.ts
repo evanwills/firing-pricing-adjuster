@@ -1,4 +1,4 @@
-import { LitElement, TemplateResult, css, html } from 'lit'
+import { LitElement, css, html } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { customElement, property, state } from 'lit/decorators.js'
 import { TMember } from '../../types/people.d';
@@ -48,7 +48,7 @@ export class MemberList extends LitElement {
   render() {
     return html`
       <ul class="members-list">
-        ${repeat(this.list, (member : TMember) => member.id, (member : TMember) => html`
+        ${repeat(this.list, (member : TMember) => `${member.id}-${this.editable}`, (member : TMember) => html`
           <member-details
             .action=${this.action}
             ?editable=${this.editable}
@@ -57,7 +57,7 @@ export class MemberList extends LitElement {
             .makersMark=${member.makersMark}></member-details>`)}
         <member-details
           .action=${this.action}
-          ?editable="${this.newEditable}"
+          editable
           member-id=""
           name=""
           makers-mark=""></member-details>
