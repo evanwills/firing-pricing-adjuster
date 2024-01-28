@@ -5,7 +5,7 @@ import { TMakerEventData, TMember, TPerson } from '../types/people.d';
 import { TMemberDetailsEventData } from '../types/components.d';
 import { TFiringType } from '../types/price-sheet.d';
 import { getUniqueID, listMemberNames, sortMembers } from './utils/member.utils';
-import { copyToClipboard, dateFromISO, renderTxtPriceList, storageAvailable, updateTotals } from './utils/general.utils';
+import { copyToClipboard, dateFromISO, firingName, renderTxtPriceList, storageAvailable, updateTotals } from './utils/general.utils';
 import './components/member-list';
 import './components/price-list';
 
@@ -13,8 +13,8 @@ const firingTypes : Array<TFiringType> = [
   {
     name: 'Bisque',
     default: 1000,
-    min: 950,
-    max: 1050
+    min: 900,
+    max: 1100
   },
   {
     name: 'Earthenware',
@@ -33,6 +33,24 @@ const firingTypes : Array<TFiringType> = [
     default: 1260,
     min: 1250,
     max: 1320
+  },
+  {
+    name: 'Onglaze/Luster',
+    default: 550,
+    min: 400,
+    max: 700
+  },
+  {
+    name: 'Pit',
+    default: 800,
+    min: 700,
+    max: 900
+  },
+  {
+    name: 'Raku',
+    default: 800,
+    min: 750,
+    max: 1050
   },
 ];
 const dateErrorMsg = 'Pricing cannot be done in the future';
@@ -698,7 +716,7 @@ export class FiringPricingAdjuster extends LitElement {
             ${firingTypes.map((item : TFiringType) : TemplateResult => html`
               <option value="${item.name}"
                      ?selected=${item.name === this.firingType}>
-                ${item.name} ${item.name !== 'Bisque' ? 'Glaze' : ''}
+                ${item.name} ${firingName(item.name)}
               </option>
             `)}
           </select>

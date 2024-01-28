@@ -1,4 +1,7 @@
+import { TemplateResult } from "lit";
 import { TPerson } from "../../types/people";
+import { TFiringType } from "../../types/price-sheet";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
 export const storageAvailable = (prop : string) : boolean => {
   let storage;
@@ -112,4 +115,15 @@ export const copyToClipboard = async (text: string) => {
   } catch (err) {
     // console.error('Failed to copy: ', err);
   }
-}
+};
+
+export const firingName = (name : string) : string => {
+  if (name === 'Bisque') {
+    return '';
+  }
+  if (name === 'Pit') {
+    return 'firing';
+  }
+
+  return 'glaze';
+};

@@ -149,7 +149,7 @@ export class MemberDetails extends LitElement {
             <input type="text"
                   .value=${this.newName}
                    aria-label="Member name"
-                   placeholder="name (e.g. gabe)"
+                   placeholder="name (e.g. Gabe)"
                   @change=${this._memberChange}
                   @keyup=${this._memberChange} />`
           : html`

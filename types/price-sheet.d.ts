@@ -1,6 +1,9 @@
 import { TMember, TPerson } from "./people"
 
 export enum EFiringType  {
+  'Onglaze/Luster',
+  Pit,
+  Raku,
   Bisque,
   Earthenware,
   Midfire,
