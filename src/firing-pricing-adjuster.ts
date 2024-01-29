@@ -1,13 +1,43 @@
-import { LitElement, TemplateResult, css, html } from 'lit';
+import {
+  LitElement,
+  TemplateResult,
+  css,
+  html,
+} from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { choose } from 'lit/directives/choose.js';
 import { repeat } from 'lit/directives/repeat.js';
+
 import { TMakerEventData, TMember, TPerson } from '../types/people.d';
 import { TMemberDetailsEventData } from '../types/components.d';
 import { TFiringType } from '../types/price-sheet.d';
-import { getUniqueID, listMemberNames, sortMembers } from './utils/member.utils';
-import { copyToClipboard, dateFromISO, firingName, renderTxtPriceList, storageAvailable, updateTotals } from './utils/general.utils';
+
+import {
+  copyToClipboard,
+  dateFromISO,
+  firingName,
+  renderTxtPriceList,
+  storageAvailable,
+  updateTotals,
+} from './utils/general.utils';
+import {
+  getUniqueID,
+  listMemberNames,
+  sortMembers,
+} from './utils/member.utils';
+import {
+  costOfFringInfo,
+  firingTypeInfo,
+  helpBtn,
+  packedByInfo,
+  pricedByInfo,
+  topTempInfo,
+  unpackingDateInfo,
+} from './utils/pure-renderers';
+
 import './components/member-list';
 import './components/price-list';
+import './components/help-info';
 
 const firingTypes : Array<TFiringType> = [
   {
@@ -79,38 +109,7 @@ export class FiringPricingAdjuster extends LitElement {
    * Copy for the read the docs hint.
    */
   @state()
-  membersList : Array<TMember> = [
-    // {
-    //   id: 'evanw',
-    //   name: 'Evan Wills',
-    //   makersMark: '',
-    //   pos: 0,
-    // },
-    // {
-    //   id: 'georgiep',
-    //   name: 'Georgie Pike',
-    //   makersMark: '',
-    //   pos: 1,
-    // },
-    // {
-    //   id: 'mark',
-    //   name: 'Mark Malek',
-    //   makersMark: '',
-    //   pos: 4,
-    // },
-    // {
-    //   id: 'natasha',
-    //   name: 'Natasha Holdem',
-    //   makersMark: '',
-    //   pos: 3,
-    // },
-    // {
-    //   id: 'netta',
-    //   name: 'Netta Egoz',
-    //   makersMark: '',
-    //   pos: 2,
-    // },
-  ]
+  membersList : Array<TMember> = []
 
   @state()
   action : string = '';
@@ -135,6 +134,12 @@ export class FiringPricingAdjuster extends LitElement {
 
   @state()
   firingDate : string = dateFromISO(new Date());
+
+  @state()
+  helpBlock : string = '';
+
+  @state()
+  helpModal : HTMLDialogElement|null = null;
 
   @state()
   maxDate : string = '';
@@ -245,6 +250,10 @@ export class FiringPricingAdjuster extends LitElement {
       default:
         throw new Error(`could not add user "${id} to ${action}`);
     }
+  }
+
+  private _closeHelp() : void {
+    this.helpModal?.close();
   }
 
   private _closeMemberList() : void {
@@ -452,6 +461,12 @@ export class FiringPricingAdjuster extends LitElement {
     }
   }
 
+  private _showHelp(event : InputEvent) : void {
+    const target = event.target as HTMLButtonElement;
+    this.helpBlock = target.value;
+    this._showHelpModal();
+  }
+
   private _showMemberModal() {
     if (this.memberModal === null) {
       const tmp = this.renderRoot.querySelector('#member-dialogue');
@@ -465,6 +480,20 @@ export class FiringPricingAdjuster extends LitElement {
       this.memberModal.showModal();
     }
   }
+
+  private _showHelpModal() {
+    if (this.helpModal === null) {
+      const tmp = this.renderRoot.querySelector('#help');
+
+      if (typeof tmp !== 'undefined' && tmp !== null) {
+        this.helpModal = tmp as HTMLDialogElement;
+      }
+    }
+
+    if (this.helpModal !== null && typeof this.helpModal !== 'undefined') {
+      this.helpModal.showModal();
+    }
+  };
 
   private _showReportModal() {
     if (this.reportModal === null) {
@@ -490,9 +519,10 @@ export class FiringPricingAdjuster extends LitElement {
     }
 
     this.report = `The last ${type}${temp} firing (packed by: `
-      + `${listMemberNames(this.packedBy)}) has been upacked by `
-      + `${listMemberNames(this.pricedBy)}.\n\nBelow are the for the `
-      + `member's fired work:\n${renderTxtPriceList(this.work)}`;
+      + `${listMemberNames(this.packedBy)}) has been unpacked by `
+      + `${listMemberNames(this.pricedBy)}.\n\nBelow are the prices `
+      + 'for the member\'s fired work:\n'
+      + renderTxtPriceList(this.work);
 
     this._showReportModal();
   }
@@ -686,6 +716,43 @@ export class FiringPricingAdjuster extends LitElement {
       font-size: 1.4rem;
       margin-top: 0;
     }
+    .help-btn {
+      border-radius: 2rem;
+      border: 0.05rem solid #ccc;
+      display: inline-block;
+      width: 1.25rem;
+      height: 1.25rem;
+      text-align: center;
+    }
+    #help {
+      text-align: left;
+      max-width: 30rem;
+    }
+    #help ul {
+      margin-left: 1rem;
+    }
+    #help li { padding-left: 0.5rem; }
+
+    #help table {
+      border-spacing: 0;
+      border-collapse: collaspe;
+    }
+    #help td, #help th {
+      padding: 0.3rem 0.5rem;
+    }
+    #help tbody td, #help tbody th {
+      border-top: 0.05rem solid #bbb;
+    }
+    #help tbody td, #help thead th {
+      text-align: center;
+    }
+    #help thead th {
+      vertical-align: bottom;
+    }
+    #help .note {
+      padding-left: 2.95rem;
+      text-indent: -2.95rem;
+    }
   `
 
   //  END:  Styling
@@ -704,6 +771,7 @@ export class FiringPricingAdjuster extends LitElement {
                  type="date"
                 .value=${this.firingDate}
                 @change=${this._setProp} />
+          ${helpBtn('firingDate', 'Unpacking date', this._showHelp)}
           ${(this.dateError !== '')
             ? html`<p class="error-msg">${this.dateError}</p>`
             : ''}
@@ -720,6 +788,7 @@ export class FiringPricingAdjuster extends LitElement {
               </option>
             `)}
           </select>
+          ${helpBtn('firingType', 'Type of firing', this._showHelp)}
         </li>
         <li class="key-value-pair">
           <label for="firingTemp">Top temperature:</label>
@@ -731,6 +800,7 @@ export class FiringPricingAdjuster extends LitElement {
                  type="number"
                 .value=${this.firingTemp}
                 @change=${this._setProp} />
+          ${helpBtn('firingTemp', 'Top temperature', this._showHelp)}
           ${(this.tempError !== '')
             ? html`<p class="error-msg">${this.tempError}</p>`
             : ''}
@@ -752,6 +822,7 @@ export class FiringPricingAdjuster extends LitElement {
                  type="number"
                 .value=${this.firingCost}
                 @change=${this._setProp} />
+          ${helpBtn('firingCost', 'Cost of firing', this._showHelp)}
         </li>
         <li class="doer-list">
           <span class="name-list--label">Packed by:</span>
@@ -763,6 +834,7 @@ export class FiringPricingAdjuster extends LitElement {
           ${(this.packedBy.length > 0)
             ? html`<button value="remove-packed-by" @click=${this._removeDoer}>-</button>`
             : ''}
+          ${helpBtn('packedBy', 'Packed by', this._showHelp)}
         </li>
         <li class="doer-list">
           <span class="name-list--label">Unpacked by:</span>
@@ -774,6 +846,7 @@ export class FiringPricingAdjuster extends LitElement {
           ${(this.pricedBy.length > 0)
             ? html`<button value="remove-priced-by" @click=${this._removeDoer}>-</button>`
             : ''}
+          ${helpBtn('pricedBy', 'Unpacked by', this._showHelp)}
         </li>
       </ul>
       ${(this._showErrors())
@@ -822,9 +895,24 @@ export class FiringPricingAdjuster extends LitElement {
       <dialog id="price-report">
         <h2>Pricing report to send to members</h2>
         <textarea>${this.report}</textarea>
-        <!-- <pre>${this.report}</pre> -->
         <button aria-label="Close member list" class="close-dialogue" @click=${this._closePriceReport}>X</button>
         <button aria-label="Copy report" @click=${this._copyReport}>Copy</button>
+      </dialog>
+
+      <dialog id="help">
+        ${choose(
+          this.helpBlock,
+          [
+            ['firingDate', unpackingDateInfo],
+            ['firingType', () => firingTypeInfo(firingTypes)],
+            ['firingTemp', topTempInfo],
+            ['firingCost', costOfFringInfo],
+            ['packedBy', packedByInfo],
+            ['pricedBy', pricedByInfo],
+          ],
+          () => html`<help-info></help-info>`,
+        )}
+        <button aria-label="Close help" class="close-dialogue" @click=${this._closeHelp}>X</button>
       </dialog>
     `;
   }

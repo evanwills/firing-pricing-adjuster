@@ -1,10 +1,13 @@
 import { LitElement, css, html } from 'lit'
 import { customElement, property } from 'lit/decorators.js';
 import { TFiringType } from '../../types/price-sheet';
-import { firingHelp } from '../utils/general.utils';
-import { costOfFringInfo, firingTypeInfo, packedByInfo, pricedByInfo, topTempInfo, unpackingDateInfo } from '../utils/pure-renderers';
-
-const glazeTemp = (name)
+import {
+  firingTypeInfo,
+  packedByInfo,
+  pricedByInfo,
+  topTempInfo,
+  unpackingDateInfo,
+} from '../utils/pure-renderers';
 
 /**
  * An example element.
@@ -55,6 +58,10 @@ export class HelpInfo extends LitElement {
         ${topTempInfo()}
         ${packedByInfo()}
         ${pricedByInfo()}
+
+        <h3 id="managing-members">Managing members</h3>
+
+
       <section>
     `
   }

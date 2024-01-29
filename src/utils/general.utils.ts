@@ -1,7 +1,7 @@
-import { TemplateResult } from "lit";
+// import { TemplateResult } from "lit";
 import { TPerson } from "../../types/people";
-import { TFiringType } from "../../types/price-sheet";
-import { unsafeHTML } from "lit/directives/unsafe-html.js";
+// import { TFiringType } from "../../types/price-sheet";
+// import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
 export const storageAvailable = (prop : string) : boolean => {
   let storage;
@@ -118,7 +118,7 @@ export const copyToClipboard = async (text: string) => {
 };
 
 export const firingName = (name : string) : string => {
-  if (name === 'Bisque') {
+  if (name === 'Bisque' || name === 'Raku' || name.includes('glaze')) {
     return '';
   }
   if (name === 'Pit') {
@@ -127,3 +127,13 @@ export const firingName = (name : string) : string => {
 
   return 'glaze';
 };
+
+export const normaliseName = (name : string) : string => {
+  return name.replace(/[^a-z0-9]+/ig, '').toLowerCase();
+};
+
+export const filterName = (name : string, filter : string) : boolean => {
+  const _name = normaliseName(name);
+
+  return _name.includes(filter);
+}
